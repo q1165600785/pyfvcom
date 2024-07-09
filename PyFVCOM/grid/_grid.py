@@ -685,6 +685,188 @@ class OpenBoundary(object):
         # Feels a bit ridiculous having a whole method for this...
         setattr(self, 'type', obc_type)
 
+
+    def add_fes2014_tides(self, fes2014_harmonics, predict='zeta', interval=1 / 24,
+                        constituents=['M2'], serial=False,
+                          interp_method='linear',pool_size=None, scale=1, noisy=False):
+        """
+        Add TPXO tides at the open boundary nodes.
+
+        Parameters
+        ----------
+        tpxo_harmonics : str, pathlib.Path, list
+            Path to the TPXO harmonics netCDF file to use.
+            Can be a list of paths for each constituent.
+        predict : str, optional
+            Type of data to predict. Select 'zeta' (default), 'u' or 'v'.
+        interval : str, optional
+            Time sampling interval in days. Defaults to 1 hour.
+        constituents : list, optional
+            List of constituent names to use in UTide.reconstruct.
+            Defaults to ['M2'].
+        serial : bool, optional
+            Run in serial rather than parallel. Defaults to parallel.
+        interp_method : str
+            The interpolation method to use. Defaults to 'linear'.
+            Passed to scipy.interp.RegularGridInterpolator,
+            so choose any valid one for that.
+
+        pool_size : int, optional
+            Specify number of processes for parallel run. By default it uses
+            all available.
+        scale : float, optional
+            A scale multiplier constant to convert input units to the FVCOM
+            required units. For surface elevation this is meters and for
+            velocities this is meters / second.
+        noisy : bool, optional
+            Set to True to enable some sort of progress output.
+            Defaults to False.
+
+        """
+        if not hasattr(self.time, 'start'):
+            raise AttributeError('No time data have been added to this '
+                    + 'OpenBoundary object, so we cannot predict tides.')
+        self.tide.time = date_range(self.time.start - relativedelta(days=1),
+                                    self.time.end + relativedelta(days=1),
+                                    inc=interval)
+
+        constituent_name = 'con'
+        if complex:
+            if predict == 'zeta':
+                part1_name, part2_name = 'hRe', 'hIm'
+                x, y = copy.copy(self.grid.lon), copy.copy(self.grid.lat)
+                lon_name, lat_name = 'lon_z', 'lat_z'
+            elif predict == 'u':
+                part1_name, part2_name = 'uRe', 'uIm'
+                x, y = copy.copy(self.grid.lonc), copy.copy(self.grid.latc)
+                lon_name, lat_name = 'lon_u', 'lat_u'
+            elif predict == 'v':
+                part1_name, part2_name = 'vRe', 'vIm'
+                x, y = copy.copy(self.grid.lonc), copy.copy(self.grid.latc)
+                lon_name, lat_name = 'lon_v', 'lat_v'
+
+        else:
+            if predict == 'zeta':
+                part1_name, part2_name = 'ha', 'hp'
+                x, y = copy.copy(self.grid.lon), copy.copy(self.grid.lat)
+                lon_name, lat_name = 'lon_z', 'lat_z'
+            elif predict == 'u':
+                part1_name, part2_name = 'ua', 'up'
+                x, y = copy.copy(self.grid.lonc), copy.copy(self.grid.latc)
+                lon_name, lat_name = 'lon_u', 'lat_u'
+            elif predict == 'v':
+                part1_name, part2_name = 'va', 'vp'
+                x, y = copy.copy(self.grid.lonc), copy.copy(self.grid.latc)
+                lon_name, lat_name = 'lon_v', 'lat_v'
+
+        names = {'part1_name': part1_name,
+                 'part2_name': part2_name,
+                 'lon_name': lon_name,
+                 'lat_name': lat_name,
+                 'constituent_name': constituent_name}
+
+        if isinstance(tpxo_harmonics, list):
+            available_constituents = []
+            amplitudes = []
+            phases = []
+            for harm in tpxo_harmonics:
+                (harmonics_lon, harmonics_lat, amplitudes_tmp, phases_tmp,
+                        available_constituents_tmp
+                        ) = self._load_harmonics_tpxo(harm, constituents,
+                        names, complex=complex)
+                if len(available_constituents_tmp):
+                    amplitudes.append(amplitudes_tmp)
+                    phases.append(phases_tmp)
+                    available_constituents.append(available_constituents_tmp[0])
+            amplitudes = np.array(amplitudes)
+            phases = np.array(phases)
+        else:
+            (harmonics_lon, harmonics_lat, amplitudes, phases,
+                    available_constituents
+                    ) = self._load_harmonics_tpxo(tpxo_harmonics, constituents,
+                    names, complex=complex)
+
+        (interpolated_amplitudes, interpolated_phases
+                ) = self._interpolate_tpxo_harmonics(x, y, amplitudes, phases,
+                harmonics_lon, harmonics_lat, interp_method=interp_method)
+
+        self.tide.constituents = available_constituents
+
+        # Predict the tides
+        results = self._prepare_tides(interpolated_amplitudes,
+                interpolated_phases, y, serial, pool_size)
+
+        results = np.asarray(results) * scale
+
+        if not bathy_file == '':
+            if bathy_var == '':
+                raise AttributeError('Please specify bathy_var in input.')
+            with Dataset(bathy_file, 'r') as bdata:
+                h = bdata[bathy_var][:]
+                harmonics_lon = bdata['lon_' + bathy_var[-1:]][:]
+                harmonics_lat = bdata['lat_' + bathy_var[-1:]][:]
+
+            if np.ndim(harmonics_lon) != 1 and np.ndim(harmonics_lat) != 1:
+                warn('Harmonics are given as 2D arrays: trying to convert to '
+                        + '1D for the interpolation.')
+                harmonics_lon = np.unique(harmonics_lon)
+                harmonics_lat = np.unique(harmonics_lat)
+
+            if any(harmonics_lon > 180) & any(x < 0):
+                # Fix our harmonics data position longitudes to be in the -180
+                # to 180 range to match the FVCOM range
+                tmp_h = h * 1
+                tmp_lon = harmonics_lon * 1
+                index1 = ((harmonics_lon > 180) | (harmonics_lon < -180))
+                index2 = ((harmonics_lon <= 180) & (harmonics_lon >= 0))
+                h[:np.sum(index1), :] = tmp_h[index1, :]
+                h[np.sum(index1):, :] = tmp_h[index2, :]
+                harmonics_lon[:np.sum(index1)] = tmp_lon[index1]
+                harmonics_lon[np.sum(index1):] = tmp_lon[index2]
+                harmonics_lon[harmonics_lon > 180] -= 360
+
+            if any(harmonics_lon < 0) & any(x > 180):
+                # Fix our harmonics data position longitudes to be in the 0-360
+                # range to match the FVCOM range
+                tmp_h = h * 1
+                tmp_lon = harmonics_lon * 1
+                index1 = ((harmonics_lon <= 180) & (harmonics_lon >= 0))
+                index2 = ((harmonics_lon > 180) | (harmonics_lon < -180))
+                h[:np.sum(index1), :] = tmp_h[index1, :]
+                h[np.sum(index1):, :] = tmp_h[index2, :]
+                harmonics_lon[:np.sum(index1)] = tmp_lon[index1]
+                harmonics_lon[np.sum(index1):] = tmp_lon[index2]
+                harmonics_lon[harmonics_lon < 0] += 360
+
+            h_interp = RegularGridInterpolator((harmonics_lon,
+                    harmonics_lat), h, method=interp_method,
+                    fill_value=None)
+
+            # Make our boundary positions suitable for interpolation with a
+            # RegularGridInterpolator.
+            xx = np.tile(x, [1, x.shape[0]])
+            yy = np.tile(y, [1, y.shape[0]])
+            h_int = h_interp((x, y)).T
+
+            # Convert from transport to velocity
+            results = results / np.tile(h_int, (results.shape[1], 1)).T
+
+
+        # The harmonics are calculated -/+ one day
+        # Define the bool of required time
+        tbool = ((self.tide.time >= self.time.start)
+                & (self.tide.time <= self.time.end))
+        self.tide.time = self.tide.time[tbool]
+
+        # Dump the results into the object.
+        setattr(self.tide, predict, np.asarray(results).T[tbool, ...])
+        # put the time dimension first, space last.
+
+
+
+
+
+
     def add_tpxo_tides(self, tpxo_harmonics, predict='zeta', interval=1 / 24,
                         constituents=['M2'], serial=False,
                         interp_method='linear', complex=False,

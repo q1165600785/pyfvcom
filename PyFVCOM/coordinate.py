@@ -57,10 +57,15 @@ def __convert(args):
         Coordinates following conversion.
 
     """
+    # to_crs    = CRS.from_epsg(4326)
+    # from_crs  = CRS.from_epsg('326'+zone)
+    # proj_utm_to_wgs84 = Transformer.from_crs(to_crs, from_crs, always_xy=True)
+    # direction_flag = TransformDirection.INVERSE if inverse else TransformDirection.FORWARD
+    # c, d = proj_utmtowgs84.transform(a, b, direction=direction_flag)
+
     a, b, zone, ellipsoid, datum, inverse = args
     projection = pyproj.Proj("+proj=utm +zone={} +ellps={} +datum={} +units=m +no_defs".format(zone, ellipsoid, datum))
     c, d = projection(a, b, inverse=inverse)
-
     return c, d
 
 

@@ -33,7 +33,7 @@ start = datetime.strptime('2018-04-01', '%Y-%m-%d')
 end = datetime.strptime('2018-05-01', '%Y-%m-%d')
 interval = 1 / 24  # 1 hourly in units of days
 model = pf.preproc.Model(start, end, 'estuary.2dm', sampling=interval,
-                         native_coordinates='spherical', zone='20N')
+                         native_coordinates='spherical', zone='35')
 
 
 # In[5]:

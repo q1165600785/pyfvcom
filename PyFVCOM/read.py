@@ -1801,12 +1801,12 @@ class FileReader(Domain):
         if variable in list(self.grid):
             base_attribute = self.grid
 
-        if variable is 'volume':
+        if variable == 'volume':
             if not hasattr(self.grid, 'depth_volume'):
                 self.grid_volume()
             # We'll always use depth_volume since it's vertically resolved but just grab the given layer now.
             data = self.grid.depth_volume[layer, :]
-        elif variable is 'area':
+        elif variable == 'area':
             if not hasattr(self.grid, 'art1'):
                 self.grid.art1 = np.asarray(control_volumes(self.grid.x, self.grid.y, self.grid.triangles,
                                                             element_control=False, poolsize=None))

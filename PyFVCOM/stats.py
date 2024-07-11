@@ -10,7 +10,6 @@ import numpy as np
 from scipy import stats, polyfit, polyval
 from PyFVCOM.utilities.general import fix_range
 
-
 def calculate_regression(x, y, type='lin'):
     """
     Calculate four types of regression:

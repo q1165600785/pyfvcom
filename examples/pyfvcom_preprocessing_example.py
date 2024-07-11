@@ -27,7 +27,6 @@ import PyFVCOM as pf
 
 
 # In[4]:
-
 # Define a start, end and sampling interval for the tidal data
 start = datetime.strptime('2018-04-01', '%Y-%m-%d')
 end = datetime.strptime('2018-05-01', '%Y-%m-%d')

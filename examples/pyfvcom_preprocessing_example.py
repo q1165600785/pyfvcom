@@ -42,16 +42,16 @@ model = pf.preproc.Model(start, end, 'estuary.2dm', sampling=interval,
 # We need the TPXO data to predict tides at the boundary. Get that from here:
 #    ftp://ftp.oce.orst.edu/dist/tides/Global/tpxo9_netcdf.tar.gz
 # and extract its contents in the PyFVCOM/examples directory.
-tpxo_harmonics = 'h_tpxo9.v1.nc'
-constituents = ['M2', 'S2']
+tpxo_harmonics = r'E:\fes2014\fes2014b_elevations\ocean_tide'
+constituents = ['M2', 'S2','Q1',"P1"]
 for boundary in model.open_boundaries:
     # Create a 5km sponge layer for all open boundaries.
     boundary.add_sponge_layer(5000, 0.001)
     # Set the type of open boundary we've got.
     boundary.add_type(1)  # prescribed surface elevation
     # And add some tidal data.
-    boundary.add_tpxo_tides(tpxo_harmonics, predict='zeta', constituents=constituents, interval=interval)
-
+    # boundary.add_tpxo_tides(tpxo_harmonics, predict='zeta', constituents=constituents, interval=interval)
+    boundary.add_fes2014_tides(tpxo_harmonics, predict='zeta', constituents=constituents, interval=interval)
 
 # In[6]:
 

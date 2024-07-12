@@ -9,6 +9,7 @@ from __future__ import division
 import numpy as np
 # from scipy import stats, polyfit, polyval
 from scipy import stats
+#scipy1.12 删除numpyAPI
 from numpy import polyfit,polyval
 from PyFVCOM.utilities.general import fix_range
 

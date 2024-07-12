@@ -1053,7 +1053,6 @@ class OpenBoundary(object):
         phases = []
         path_object_fes2024_dir = Path(fes2014_harmonics)
         for harm in path_object_fes2024_dir.iterdir():
-            print(harm)
             if harm.is_file() and harm.suffix == '.nc'  and (harm.stem).upper() in  constituents:
                 (harmonics_lon, harmonics_lat, amplitudes_tmp, phases_tmp ) = self._load_harmonics_fes2014(harm,names)
                 amplitudes.append(amplitudes_tmp)
@@ -1061,8 +1060,8 @@ class OpenBoundary(object):
                 available_constituents.append((harm.stem).upper())
         amplitudes = np.array(amplitudes)
         phases = np.array(phases)
-        print(amplitudes.shape)
-        print(available_constituents)
+        # print(amplitudes.shape)
+        # print(available_constituents)
         if not available_constituents:
             raise AttributeError('Not Found constituents')
 
@@ -1554,7 +1553,6 @@ class OpenBoundary(object):
         # Depending on the location of the model domain we may need to shift
         # the harmonic data to match it.
         if any(harmonics_lon > 180) & any(x < 0):
-            print(harmonics_u.shape)
             # Fix our harmonics data position longitudes to be in the -180
             # to 180 range to match the FVCOM range
             tmp_u = harmonics_u * 1

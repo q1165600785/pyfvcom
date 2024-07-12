@@ -44,7 +44,7 @@ from PyFVCOM.utilities.time import date_range
 class GridReaderNetCDF(object):
     """ Read in and store a given FVCOM grid in our data format. """
 
-    def __init__(self, filename, dims=None, zone='30N', debug=False, verbose=False):
+    def __init__(self, filename, dims=None, zone='30', debug=False, verbose=False):
         """
         Load the grid data.
 
@@ -987,7 +987,7 @@ class OpenBoundary(object):
 
     def add_fes2014_tides(self, fes2014_harmonics, predict='zeta', interval=1 / 24,
                           constituents=['M2'], serial=False,
-                          interp_method='linear', pool_size=None, scale=1, noisy=False):
+                          interp_method='linear', pool_size=None, scale=1,  bathy_file='', bathy_var='',noisy=False):
         """
         Add TPXO tides at the open boundary nodes.
 
@@ -1053,6 +1053,7 @@ class OpenBoundary(object):
         phases = []
         path_object_fes2024_dir = Path(fes2014_harmonics)
         for harm in path_object_fes2024_dir.iterdir():
+            print(harm)
             if harm.is_file() and harm.suffix == '.nc'  and (harm.stem).upper() in  constituents:
                 (harmonics_lon, harmonics_lat, amplitudes_tmp, phases_tmp ) = self._load_harmonics_fes2014(harm,names)
                 amplitudes.append(amplitudes_tmp)
@@ -1063,7 +1064,7 @@ class OpenBoundary(object):
         print(amplitudes.shape)
         print(available_constituents)
         if not available_constituents:
-            raise AttributeError('No Found constituents')
+            raise AttributeError('Not Found constituents')
 
         (interpolated_amplitudes, interpolated_phases
          ) = self._interpolate_fes2014_harmonics(x, y, amplitudes, phases,
@@ -1083,7 +1084,6 @@ class OpenBoundary(object):
             with Dataset(bathy_file, 'r') as bdata:
                 h = bdata[bathy_var][:]
                 harmonics_lon = bdata['lon_' + bathy_var[-1:]][:]
-                harmonics_lat = bdata['lat_' + bathy_var[-1:]][:]
 
             if np.ndim(harmonics_lon) != 1 and np.ndim(harmonics_lat) != 1:
                 warn('Harmonics are given as 2D arrays: trying to convert to '
@@ -1274,13 +1274,11 @@ class OpenBoundary(object):
         # cidx = [const.index(i) for i in constituents if i in const]
         # # Save the names of the constituents we've actually used.
         # available_constituents = [constituents[i] for i in cidx]
-        with Dataset(str(harmonics), 'r') as tides:
-            harmonics_lon = tides.variables[names['lon_name']][:]
-            harmonics_lat = tides.variables[names['lat_name']][:]
-
-            amplitudes = tides.variables[names['amplitude_name']][:]
-            phases = tides.variables[names['phase_name']][:]
-
+        with Dataset(harmonics, 'r') as tides:
+            harmonics_lon = tides.variables[names['lon_name']][:]  #5760
+            harmonics_lat = tides.variables[names['lat_name']][:] #2881
+            amplitudes = tides.variables[names['amplitude_name']][:].T  #2881,5760
+            phases = tides.variables[names['phase_name']][:].T  #2881,5760
         # amplitude_shape = tides.variables[names['amplitude_name']][:].shape
         # if amplitude_shape[0] == len(const):
         #     amplitudes = tides.variables[names['amplitude_name']][cidx, ...]
@@ -1550,12 +1548,13 @@ class OpenBoundary(object):
             harmonics_lat = np.unique(harmonics_lat)
 
         # Since interpolating phase directly is a bad idea (cos of the
-        # 360 -> 0 degree thing) convert to vectors first
+        # 360 -> 0 degree thing) convert to vectors first  转换成复数的实部和虚部
         harmonics_u, harmonics_v = pol2cart(amp_data, phase_data, degrees=True)
 
         # Depending on the location of the model domain we may need to shift
         # the harmonic data to match it.
         if any(harmonics_lon > 180) & any(x < 0):
+            print(harmonics_u.shape)
             # Fix our harmonics data position longitudes to be in the -180
             # to 180 range to match the FVCOM range
             tmp_u = harmonics_u * 1

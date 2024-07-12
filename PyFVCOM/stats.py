@@ -7,7 +7,9 @@ functions.
 from __future__ import division
 
 import numpy as np
-from scipy import stats, polyfit, polyval
+# from scipy import stats, polyfit, polyval
+from scipy import stats
+from numpy import polyfit,polyval
 from PyFVCOM.utilities.general import fix_range
 
 def calculate_regression(x, y, type='lin'):

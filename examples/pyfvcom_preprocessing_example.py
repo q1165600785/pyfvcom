@@ -46,7 +46,7 @@ def pro_file_make():
     interval = 1 / 24  # 1 hourly in units of days
     model = pf.preproc.Model(start, end, filename, sampling=interval,
                          native_coordinates='spherical', zone='35',debug=True)
-
+    model.add_bed_roughness(0.027)
 
 # In[5]:
 
@@ -78,13 +78,15 @@ def pro_file_make():
 
     # Write out the files for FVCOM.
     casenmae='zyj'
-    model.write_grid(casenmae+'_grd.dat', depth_file=casenmae+'_dep.dat')
-    model.write_sponge(casenmae+'_spg.dat')
-    model.write_obc(casenmae+'_obc.dat')
-    model.write_coriolis(casenmae+'_cor.dat')
-    model.write_sigma('sigma.dat')
-    model.write_tides(casenmae+'_elevtide.nc')
-
+    # model.write_grid(casenmae+'_grd.dat', depth_file=casenmae+'_dep.dat')
+    # model.write_sponge(casenmae+'_spg.dat')
+    # model.write_obc(casenmae+'_obc.dat')
+    # model.write_coriolis(casenmae+'_cor.dat')
+    # model.write_sigma('sigma.dat')
+    # model.write_tides(casenmae+'_elevtide.nc')
+    #
+    model.write_bed_roughness(casenmae+'_brf.nc')
+    #
 
     # In[9]:
 

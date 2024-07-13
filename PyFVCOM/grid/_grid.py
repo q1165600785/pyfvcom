@@ -1077,58 +1077,6 @@ class OpenBoundary(object):
 
         results = np.asarray(results) * scale
 
-        if not bathy_file == '':
-            if bathy_var == '':
-                raise AttributeError('Please specify bathy_var in input.')
-            with Dataset(bathy_file, 'r') as bdata:
-                h = bdata[bathy_var][:]
-                harmonics_lon = bdata['lon_' + bathy_var[-1:]][:]
-
-            if np.ndim(harmonics_lon) != 1 and np.ndim(harmonics_lat) != 1:
-                warn('Harmonics are given as 2D arrays: trying to convert to '
-                     + '1D for the interpolation.')
-                harmonics_lon = np.unique(harmonics_lon)
-                harmonics_lat = np.unique(harmonics_lat)
-
-            if any(harmonics_lon > 180) & any(x < 0):
-                # Fix our harmonics data position longitudes to be in the -180
-                # to 180 range to match the FVCOM range
-                tmp_h = h * 1
-                tmp_lon = harmonics_lon * 1
-                index1 = ((harmonics_lon > 180) | (harmonics_lon < -180))
-                index2 = ((harmonics_lon <= 180) & (harmonics_lon >= 0))
-                h[:np.sum(index1), :] = tmp_h[index1, :]
-                h[np.sum(index1):, :] = tmp_h[index2, :]
-                harmonics_lon[:np.sum(index1)] = tmp_lon[index1]
-                harmonics_lon[np.sum(index1):] = tmp_lon[index2]
-                harmonics_lon[harmonics_lon > 180] -= 360
-
-            if any(harmonics_lon < 0) & any(x > 180):
-                # Fix our harmonics data position longitudes to be in the 0-360
-                # range to match the FVCOM range
-                tmp_h = h * 1
-                tmp_lon = harmonics_lon * 1
-                index1 = ((harmonics_lon <= 180) & (harmonics_lon >= 0))
-                index2 = ((harmonics_lon > 180) | (harmonics_lon < -180))
-                h[:np.sum(index1), :] = tmp_h[index1, :]
-                h[np.sum(index1):, :] = tmp_h[index2, :]
-                harmonics_lon[:np.sum(index1)] = tmp_lon[index1]
-                harmonics_lon[np.sum(index1):] = tmp_lon[index2]
-                harmonics_lon[harmonics_lon < 0] += 360
-
-            h_interp = RegularGridInterpolator((harmonics_lon,
-                                                harmonics_lat), h, method=interp_method,
-                                               fill_value=None)
-
-            # Make our boundary positions suitable for interpolation with a
-            # RegularGridInterpolator.
-            xx = np.tile(x, [1, x.shape[0]])
-            yy = np.tile(y, [1, y.shape[0]])
-            h_int = h_interp((x, y)).T
-
-            # Convert from transport to velocity
-            results = results / np.tile(h_int, (results.shape[1], 1)).T
-
         # The harmonics are calculated -/+ one day
         # Define the bool of required time
         tbool = ((self.tide.time >= self.time.start)
